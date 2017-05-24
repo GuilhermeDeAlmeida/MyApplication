@@ -6,12 +6,15 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.StringReader;
@@ -20,24 +23,25 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
     private Button scanBtn;
     String qrCodeContent;
+    ArrayList<String> qrCodes;
+    MainActivityConector requester = new MainActivityConector();
+    String url = "https://techdion.com.br/networkpesquisa/ws";
+    TextView respostaSistema;
+    private Intent intent;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        scanBtn = (Button) findViewById(R.id.scan_btn);
-
         final Activity activity = this;
-        scanBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                IntentIntegrator intentIntegrator = new IntentIntegrator(activity);
-                loadQRCodeIntentIntegrator(intentIntegrator);
-            }
-        });
+        IntentIntegrator intentIntegrator = new IntentIntegrator(activity);
+        loadQRCodeIntentIntegrator(intentIntegrator);
     }
     private void loadQRCodeIntentIntegrator(IntentIntegrator intentIntegrator){
         intentIntegrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
@@ -46,34 +50,9 @@ public class MainActivity extends AppCompatActivity {
         intentIntegrator.setBeepEnabled(false);
         intentIntegrator.setBarcodeImageEnabled(false);
         intentIntegrator.initiateScan();
-    }
-    private void getText() throws UnsupportedEncodingException {
-        String data = URLEncoder.encode("id", "UTF-8") + "=" + URLEncoder.encode(qrCodeContent, "UTF-8");
-        String text = "";
-        BufferedReader reader = null;
-        try {
-            URL url = new URL("https://techdion.com.br/ws/index.php");
-            Toast.makeText(this, "Chegou a colocar a URL", Toast.LENGTH_LONG).show();
-            URLConnection conn = url.openConnection();
-            conn.setDoOutput(true);
-            OutputStreamWriter wr = new OutputStreamWriter(conn.getOutputStream());
-            wr.write( data );
-            wr.flush();
 
-        } catch (java.io.IOException e) {
-            e.printStackTrace();
-        }
-        finally
-        {
-            try
-            {
-                Toast.makeText(this, "Fechou a conexão", Toast.LENGTH_LONG).show();
-                reader.close();
-            }
-
-            catch(Exception ex) {}
-        }
     }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
@@ -82,10 +61,11 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "Você cancelou o scan", Toast.LENGTH_LONG).show();
             }
             else {
-                Toast.makeText(this, result.getContents(), Toast.LENGTH_LONG).show();
                 setQrCodeContent(result.getContents());
+                Toast.makeText(this, "Valor atualizado no Web Service: " + "' "+ qrCodeContent + " '", Toast.LENGTH_LONG).show();
+                finish();
                 try {
-                    getText();
+                    consultarQRCode();
                 }catch (Exception ex){
                     ex.printStackTrace();
                 }
@@ -98,7 +78,29 @@ public class MainActivity extends AppCompatActivity {
     public void setQrCodeContent(String qrCodeContent){
         this.qrCodeContent = qrCodeContent;
     }
-    public void test(){
-        StringRequest request
+    public void consultarQRCode(){
+        requester = new MainActivityConector();
+        if (requester.isConnected(this)){
+            //progess bar TODO
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        qrCodes = requester.get(url,qrCodeContent);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                            }
+                        });
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+        } else {
+            Toast toast = Toast.makeText(this, "Rede indisponível!", Toast.LENGTH_LONG);
+            toast.show();
+        }
     }
 }
